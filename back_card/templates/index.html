@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>银行卡管理系统</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; background-color: #f5f5f5; }
+        .page { display: none; padding: 25px; background-color: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .page.active { display: block; }
+        h1 { text-align: center; color: #333; margin-bottom: 30px; }
+        h2 { color: #444; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+        .form-group { margin: 15px 0; }
+        label { display: block; margin-bottom: 5px; color: #666; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        button { padding: 12px 20px; border: none; border-radius: 5px; background-color: #007bff; color: white; cursor: pointer; margin: 10px 5px; }
+        button:hover { background-color: #0056b3; }
+        .btn-secondary { background-color: #6c757d; }
+        .btn-secondary:hover { background-color: #5a6268; }
+        .result { margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; border: 1px solid #eee; }
+        .result h3 { margin-top: 0; color: #333; }
+        .function-buttons { text-align: center; margin: 20px 0; }
+        .function-card { border: 1px solid #eee; border-radius: 8px; padding: 20px; margin: 15px 0; text-align: center; }
+    </style>
+</head>
+<body>
+    <h1>银行卡管理系统</h1>
+
+    <!-- 1. 登录页面（初始显示） -->
+    <div id="loginPage" class="page active">
+        <h2>用户登录</h2>
+        <div class="form-group">
+            <label for="loginUser">用户名</label>
+            <input type="text" id="loginUser" placeholder="请输入用户名">
+        </div>
+        <div class="form-group">
+            <label for="loginPwd">密码</label>
+            <input type="password" id="loginPwd" placeholder="请输入密码">
+        </div>
+        <button onclick="login()">登录</button>
+        <button class="btn-secondary" onclick="showPage('registerPage')">注册账号</button>
+        
+        <div class="result">
+            <h3>操作结果：</h3>
+            <p id="loginResult"></p>
+        </div>
+    </div>
+
+    <!-- 2. 注册页面 -->
+    <div id="registerPage" class="page">
+        <h2>用户注册</h2>
+        <div class="form-group">
+            <label for="regUser">用户名</label>
+            <input type="text" id="regUser" placeholder="请设置用户名">
+        </div>
+        <div class="form-group">
+            <label for="regPwd">密码</label>
+            <input type="password" id="regPwd" placeholder="请设置密码">
+        </div>
+        <button onclick="register()">完成注册</button>
+        <button class="btn-secondary" onclick="showPage('loginPage')">返回登录</button>
+        
+        <div class="result">
+            <h3>操作结果：</h3>
+            <p id="regResult"></p>
+        </div>
+    </div>
+
+    <!-- 3. 功能主页（登录成功后显示） -->
+    <div id="funcPage" class="page">
+        <h2>账户功能中心</h2>
+        <div id="userInfo" style="text-align: center; color: #666; margin-bottom: 20px;"></div>
+        
+        <!-- 功能按钮区 -->
+        <div class="function-card">
+            <h3>存取款操作</h3>
+            <div class="form-group">
+                <label for="funcAccountId">账户ID（自动填充）</label>
+                <input type="text" id="funcAccountId" readonly>
+            </div>
+            <div class="form-group">
+                <label for="amount">操作金额（元）</label>
+                <input type="number" id="amount" step="0.01" placeholder="请输入金额">
+            </div>
+            <button onclick="deposit()">存款</button>
+            <button onclick="withdraw()">取款</button>
+            <button onclick="queryBalance()">查询余额</button>
+        </div>
+
+        <div class="function-card">
+            <h3>账户管理</h3>
+            <button onclick="loseAccount()">挂失账户（冻结）</button>
+            <button class="btn-secondary" onclick="closeAccount()">销户（谨慎操作）</button>
+            <button class="btn-secondary" onclick="logout()">退出登录</button>
+        </div>
+        
+        <div class="result">
+            <h3>操作结果：</h3>
+            <p id="funcResult"></p>
+        </div>
+    </div>
+
+    <script>
+        const baseUrl = '';
+        let currentAccountId = ''; // 存储当前登录的账户ID
+
+        // 切换页面显示（隐藏所有，显示指定页面）
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            document.getElementById(pageId).classList.add('active');
+            // 清空所有结果显示
+            document.getElementById('loginResult').innerText = '';
+            document.getElementById('regResult').innerText = '';
+            document.getElementById('funcResult').innerText = '';
+        }
+
+        // 1. 登录功能
+        function login() {
+            const username = document.getElementById('loginUser').value;
+            const password = document.getElementById('loginPwd').value;
+            if (!username || !password) {
+                document.getElementById('loginResult').innerText = '用户名和密码不能为空！';
+                return;
+            }
+
+            fetch(`${baseUrl}/user/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('loginResult').innerText = JSON.stringify(data, null, 2);
+                if (data.code === 0) {
+                    // 登录成功：记录账户ID，切换到功能页
+                    currentAccountId = data.account_id;
+                    document.getElementById('funcAccountId').value = currentAccountId;
+                    document.getElementById('userInfo').innerText = `当前登录账户：${data.account_id}`;
+                    // 清空登录输入框
+                    document.getElementById('loginUser').value = '';
+                    document.getElementById('loginPwd').value = '';
+                    // 切换页面
+                    setTimeout(() => showPage('funcPage'), 1000);
+                }
+            })
+            .catch(err => {
+                document.getElementById('loginResult').innerText = '登录失败：' + err;
+            });
+        }
+
+        // 2. 注册功能
+        function register() {
+            const username = document.getElementById('regUser').value;
+            const password = document.getElementById('regPwd').value;
+            if (!username || !password) {
+                document.getElementById('regResult').innerText = '用户名和密码不能为空！';
+                return;
+            }
+
+            fetch(`${baseUrl}/user/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('regResult').innerText = JSON.stringify(data, null, 2);
+                if (data.code === 0) {
+                    // 注册成功后返回登录页
+                    setTimeout(() => {
+                        showPage('loginPage');
+                        // 清空注册输入框
+                        document.getElementById('regUser').value = '';
+                        document.getElementById('regPwd').value = '';
+                    }, 1500);
+                }
+            })
+            .catch(err => {
+                document.getElementById('regResult').innerText = '注册失败：' + err;
+            });
+        }
+
+        // 3. 存款功能
+        function deposit() {
+            const amount = document.getElementById('amount').value;
+            if (!amount || amount <= 0) {
+                document.getElementById('funcResult').innerText = '请输入有效的存款金额！';
+                return;
+            }
+
+            fetch(`${baseUrl}/transaction/deposit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ account_id: currentAccountId, amount })
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('funcResult').innerText = JSON.stringify(data, null, 2);
+                document.getElementById('amount').value = ''; // 清空金额输入框
+            })
+            .catch(err => {
+                document.getElementById('funcResult').innerText = '存款失败：' + err;
+            });
+        }
+
+        // 4. 取款功能
+        function withdraw() {
+            const amount = document.getElementById('amount').value;
+            if (!amount || amount <= 0) {
+                document.getElementById('funcResult').innerText = '请输入有效的取款金额！';
+                return;
+            }
+
+            fetch(`${baseUrl}/transaction/withdraw`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ account_id: currentAccountId, amount })
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('funcResult').innerText = JSON.stringify(data, null, 2);
+                document.getElementById('amount').value = ''; // 清空金额输入框
+            })
+            .catch(err => {
+                document.getElementById('funcResult').innerText = '取款失败：' + err;
+            });
+        }
+
+        // 5. 查询余额
+        function queryBalance() {
+            fetch(`${baseUrl}/transaction/query?account_id=${currentAccountId}`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('funcResult').innerText = JSON.stringify(data, null, 2);
+            })
+            .catch(err => {
+                document.getElementById('funcResult').innerText = '查询失败：' + err;
+            });
+        }
+
+        // 6. 挂失账户
+        function loseAccount() {
+            if (confirm('确定要挂失账户吗？挂失后账户会被冻结！')) {
+                fetch(`${baseUrl}/account/lose`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ account_id: currentAccountId })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('funcResult').innerText = JSON.stringify(data, null, 2);
+                    if (data.code === 0) {
+                        // 挂失后退出登录
+                        setTimeout(() => logout(), 2000);
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('funcResult').innerText = '挂失失败：' + err;
+                });
+            }
+        }
+
+        // 7. 销户功能
+        function closeAccount() {
+            if (confirm('确定要销户吗？销户后账户和数据会永久删除，无法恢复！')) {
+                fetch(`${baseUrl}/account/close`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ account_id: currentAccountId })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('funcResult').innerText = JSON.stringify(data, null, 2);
+                    if (data.code === 0) {
+                        // 销户后返回登录页
+                        setTimeout(() => {
+                            currentAccountId = '';
+                            showPage('loginPage');
+                        }, 2000);
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('funcResult').innerText = '销户失败：' + err;
+                });
+            }
+        }
+
+        // 8. 退出登录
+        function logout() {
+            currentAccountId = '';
+            document.getElementById('amount').value = '';
+            showPage('loginPage');
+        }
+    </script>
+</body>
+</html>
